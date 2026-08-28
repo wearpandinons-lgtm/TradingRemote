@@ -1,0 +1,1569 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0a141e">
+<title>TradingRemote</title>
+<!-- Clean Chart Version: no fixed axis, no volume, interactive touch price crosshair -->
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#09131d;
+  --bg2:#0b1621;
+  --panel:#0d1924;
+  --panel2:#101d29;
+  --line:#1b2a37;
+  --line2:#223442;
+  --text:#f3f6f8;
+  --muted:#768797;
+  --muted2:#96a4b1;
+  --green:#13d59e;
+  --green2:#0fb889;
+  --red:#f45e69;
+  --gold:#8b7d42;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:#05090e;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input{font:inherit}
+button{cursor:pointer}
+.phone{
+  position:relative;
+  width:min(100%,430px);
+  min-height:100dvh;
+  margin:auto;
+  overflow:hidden;
+  background:var(--bg);
+  color:var(--text);
+  box-shadow:0 0 60px rgba(0,0,0,.42);
+}
+
+
+.view{display:none;padding-bottom:118px;min-height:100dvh}
+.view.active{display:block}
+.header{
+  height:54px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:0 16px;
+  border-bottom:1px solid #0f1d28;
+}
+.menu{
+  width:29px;height:25px;position:relative;flex:none;
+}
+.menu:before,.menu:after,.menu span{
+  content:"";position:absolute;left:0;height:4px;border-radius:5px;background:#eff3f5;
+}
+.menu:before{top:1px;width:27px}
+.menu span{top:10px;width:20px}
+.menu:after{top:19px;width:27px}
+.pair{
+  font-size:17px;
+  font-weight:800;
+  flex:1;
+  white-space:nowrap;
+}
+.change{color:var(--green);font-size:15px;font-weight:700}
+.info{
+  width:25px;height:25px;border:2px solid #eef2f4;border-radius:50%;
+  display:grid;place-items:center;font-size:15px;font-family:serif;font-weight:800;
+}
+.trend{font-size:15px;color:#e9edf0;white-space:nowrap}
+.chev{
+  display:inline-block;margin-left:5px;width:0;height:0;
+  border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #dce2e5;
+}
+.duration{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:10px;padding:18px 16px 10px;
+}
+.duration button{
+  height:42px;border:0;border-radius:6px;
+  background:#0f1b26;color:#738595;font-size:14px;
+}
+.duration button.active{
+  color:var(--green);
+  background:linear-gradient(110deg,#39351f,#28291d);
+  box-shadow:inset 0 0 0 1px rgba(165,146,70,.08);
+}
+.order-summary{
+  display:grid;grid-template-columns:1.15fr .78fr .95fr;
+  gap:7px;padding:18px 17px 15px;
+}
+.summary-block{min-width:0}
+.summary-block.center{text-align:center}
+.summary-block.right{text-align:right}
+.summary-label{font-size:11px;line-height:1.35;color:#a6b0b8}
+.summary-label.green{color:var(--green)}
+.summary-value{font-size:12px;margin-top:7px;white-space:nowrap;color:#d6dce0}
+.summary-value.count{font-size:23px;color:var(--green)}
+.chart-wrap{
+  border-top:1px solid #0d1d28;
+  border-bottom:1px solid #0d1d28;
+}
+.chart-tools{
+  height:41px;display:flex;align-items:center;justify-content:flex-start;gap:28px;padding:0 17px;
+  color:#8e9ba7;font-size:12px;
+}
+.chart-tools .arrow{
+  display:inline-block;margin-left:4px;width:0;height:0;
+  border-left:4px solid transparent;border-right:4px solid transparent;border-top:6px solid #71808d;
+}
+.chart{
+  position:relative;
+  height:270px;
+  overflow:hidden;
+  background:#09131d;
+  user-select:none;
+  touch-action:none;
+}
+.chart-pan{
+  position:absolute;
+  z-index:1;
+  inset:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:none;
+  cursor:grab;
+  touch-action:none;
+  overscroll-behavior:contain;
+}
+.chart-pan::-webkit-scrollbar{display:none}
+.chart-pan.dragging{cursor:grabbing}
+.chart-track{
+  position:relative;
+  height:100%;
+  width:1040px;
+  min-width:1040px;
+}
+.chart-grid{
+  position:absolute;
+  inset:0;
+  background:
+    repeating-linear-gradient(to right,transparent 0,transparent 129px,rgba(20,35,46,.78) 130px,transparent 131px),
+    linear-gradient(to bottom,
+      transparent 24.7%,rgba(20,35,46,.72) 25%,transparent 25.3%,
+      transparent 49.7%,rgba(20,35,46,.72) 50%,transparent 50.3%,
+      transparent 74.7%,rgba(20,35,46,.72) 75%,transparent 75.3%);
+  opacity:.72;
+  pointer-events:none;
+}
+#candleSvg{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+}
+.chart-crosshair{
+  position:absolute;
+  z-index:12;
+  left:0;
+  right:0;
+  height:0;
+  border-top:1px dashed rgba(220,232,238,.72);
+  pointer-events:none;
+}
+.chart-crosshair[hidden]{display:none}
+.crosshair-price{
+  position:absolute;
+  right:8px;
+  top:0;
+  transform:translateY(-50%);
+  min-width:72px;
+  padding:5px 7px;
+  border-radius:4px;
+  background:#e2e7ea;
+  color:#24313a;
+  font-size:10px;
+  font-weight:800;
+  text-align:center;
+  box-shadow:0 5px 18px rgba(0,0,0,.28);
+}
+.chart-touch-dot{
+  position:absolute;
+  top:0;
+  width:8px;
+  height:8px;
+  transform:translate(-50%,-50%);
+  border:2px solid #e7eff2;
+  border-radius:50%;
+  background:#09131d;
+}
+.time-axis{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:6px;
+  height:13px;
+  color:#667785;
+  font-size:8px;
+  pointer-events:none;
+}
+.time-axis span{
+  position:absolute;
+  transform:translateX(-50%);
+  white-space:nowrap;
+}
+.content-tabs{
+  height:54px;display:grid;grid-template-columns:1.16fr 1.28fr .86fr 1.15fr;
+  align-items:stretch;gap:0;overflow:visible;
+  padding:0 7px;border-bottom:1px solid var(--line);
+}
+.content-tab{
+  height:54px;display:flex;align-items:center;justify-content:center;
+  min-width:0;white-space:nowrap;text-align:center;
+  color:#687989;font-size:10px;position:relative;
+}
+.content-tab.active{color:#f4f6f7;font-weight:700}
+.content-tab.active:after{
+  content:"";position:absolute;left:16%;right:16%;bottom:0;height:3px;
+  background:var(--green);border-radius:999px;
+}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+.empty{
+  height:235px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:#657582;
+}
+.empty-art{position:relative;width:150px;height:115px;margin-bottom:3px}
+.cloud{
+  position:absolute;border-radius:50px;background:linear-gradient(#b6bec3,#858e94);
+}
+.cloud.c1{width:32px;height:19px;left:19px;top:18px}
+.cloud.c2{width:55px;height:31px;right:24px;top:4px}
+.building{
+  position:absolute;bottom:5px;background:linear-gradient(#e5e8ea,#a9b0b4);
+}
+.building.b1{width:28px;height:70px;left:23px}
+.building.b2{width:75px;height:78px;left:50px;border-radius:3px 3px 0 0}
+.building.b3{width:34px;height:96px;right:10px}
+.paper{
+  position:absolute;width:58px;height:63px;left:63px;bottom:17px;
+  background:#f3f4f5;border-radius:2px;
+}
+.paper:before,.paper:after{
+  content:"";position:absolute;left:14px;right:14px;height:5px;background:#c3c7ca;border-radius:2px;
+}
+.paper:before{top:22px}.paper:after{top:36px}
+.pending{
+  padding:18px 17px 20px;
+}
+.pending-head{
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:17px;
+}
+.pending-status{color:var(--red);font-size:16px}
+.cancel-btn{
+  border:1px solid var(--green);background:transparent;color:var(--green);
+  border-radius:6px;padding:9px 20px;
+}
+.pending-grid{
+  display:grid;grid-template-columns:1fr 1fr;row-gap:14px;
+  font-size:14px;
+}
+.pending-key{color:#728493}
+.pending-val{text-align:right;color:#e8ecee}
+.history-panel{padding:13px 16px}
+.history-row{
+  border-bottom:1px solid #14222e;padding:13px 0;
+}
+.history-top{display:flex;justify-content:space-between;align-items:center}
+.history-status{color:var(--green);font-size:13px}
+.history-grid{
+  display:grid;grid-template-columns:1fr 1fr;row-gap:8px;margin-top:12px;font-size:12px;
+}
+.history-grid .key{color:#728493}
+.history-grid .val{text-align:right;color:#d7dde1}
+.action-bar{
+  position:fixed;
+  z-index:15;
+  left:50%;transform:translateX(-50%);
+  bottom:63px;
+  width:min(430px,100%);
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  padding:8px 8px 7px;
+  background:#09131d;
+  border-top:1px solid #10202c;
+}
+.action-bar button{
+  height:48px;border:0;border-radius:5px;color:white;font-weight:800;
+}
+.call-main{background:var(--green)}
+.put-main{background:var(--red)}
+.action-icon{font-size:15px;margin-right:8px}
+.bottom-nav{
+  position:fixed;
+  z-index:16;
+  left:50%;transform:translateX(-50%);
+  bottom:0;width:min(430px,100%);height:64px;
+  display:grid;grid-template-columns:1fr 1fr;
+  background:#08121b;border-top:1px solid #10202c;
+}
+.nav-btn{
+  border:0;background:transparent;color:#536575;font-size:11px;
+}
+.nav-icon{
+  display:block;width:25px;height:25px;margin:0 auto 3px;
+  border:2px solid currentColor;border-radius:7px;position:relative;
+}
+.nav-btn.active{color:#e9eef1}
+.nav-btn.active .nav-icon{border-color:#e9eef1}
+.nav-icon.futures:after{
+  content:"★";position:absolute;inset:0;display:grid;place-items:center;font-size:12px;
+}
+.nav-icon.assets:after{
+  content:"";position:absolute;left:5px;right:5px;top:8px;height:6px;
+  border:2px solid currentColor;border-radius:4px;
+}
+/* Assets */
+.assets-view{padding:0 16px 105px}
+.assets-title{font-size:27px;font-weight:500;padding:16px 0 26px}
+.asset-hero{
+  position:relative;min-height:132px;border-radius:9px;padding:24px 25px;
+  background:linear-gradient(100deg,#4bcab0,#129d75);
+  overflow:hidden;
+}
+.asset-hero:after{
+  content:"";position:absolute;width:210px;height:210px;border-radius:50%;
+  right:-75px;top:-100px;background:rgba(255,255,255,.05);
+}
+.asset-label{font-size:15px;color:rgba(255,255,255,.8)}
+.asset-total{font-size:29px;font-weight:800;margin:7px 0 14px}
+.asset-day{font-size:14px;color:rgba(255,255,255,.9)}
+.asset-stats{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;
+}
+.asset-stat{
+  background:#0b151f;border:1px solid #11212d;border-radius:8px;padding:14px 11px;
+}
+.asset-stat .label{font-size:10px;color:#7d8d9b;line-height:1.3}
+.asset-stat .value{font-size:15px;font-weight:800;margin-top:7px}
+.green{color:var(--green)}
+.asset-section{font-size:20px;font-weight:500;margin:27px 0 12px}
+.account-list{background:#0a141e;border-radius:9px;overflow:hidden}
+.account-row{
+  display:flex;justify-content:space-between;align-items:center;
+  min-height:94px;padding:17px 16px;border-bottom:1px solid #101f2a;
+}
+.account-row:last-child{border-bottom:0}
+.account-name{color:#8e9cab;font-size:13px}
+.account-amount{font-size:19px;margin-top:8px}
+.account-arrow{font-size:29px;color:#d8dfe3}
+.mini-results{margin-bottom:42px}
+.mini-row{
+  display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
+  padding:13px 3px;border-bottom:1px solid #12212d;
+}
+.direction-pill{
+  font-size:10px;font-weight:800;padding:5px 8px;border-radius:999px;
+}
+.direction-pill.call{background:#0d4b39;color:#7eefd0}
+.direction-pill.put{background:#4b2027;color:#ffadb5}
+.mini-meta{font-size:11px;color:#708392;margin-top:4px}
+.result-pos{color:var(--green);font-weight:800}
+/* bottom sheet */
+.sheet-backdrop{
+  position:fixed;z-index:40;inset:0;background:rgba(0,0,0,.68);
+  opacity:0;pointer-events:none;transition:.2s;
+}
+.sheet-backdrop.open{opacity:1;pointer-events:auto}
+.sheet{
+  position:absolute;left:50%;bottom:0;transform:translate(-50%,100%);
+  width:min(430px,100%);background:#0a1620;border-top:1px solid #1b2b38;
+  transition:.24s ease;padding-bottom:max(16px,env(safe-area-inset-bottom));
+}
+.sheet-backdrop.open .sheet{transform:translate(-50%,0)}
+.sheet-header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:17px;border-bottom:1px solid var(--line);
+}
+.sheet-title{font-size:17px}
+.sheet-close{border:0;background:none;color:#f0f3f4}
+.sheet-body{padding:20px 16px}
+.sheet-summary{
+  display:grid;grid-template-columns:1fr 1fr;margin-bottom:15px;
+}
+.sheet-summary .right{text-align:right}
+.sheet-k{color:#7d8e9e;font-size:11px}
+.sheet-v{margin-top:5px;font-size:13px}
+.time-amount{
+  display:grid;grid-template-columns:104px 1fr;gap:16px;align-items:start;
+}
+.time-wheel{
+  position:relative;
+  height:164px;
+  overflow:hidden;
+  border-radius:5px;
+  background:#09131c;
+}
+.time-wheel:before,
+.time-wheel:after{
+  content:"";
+  position:absolute;
+  z-index:4;
+  left:0;
+  right:0;
+  height:49px;
+  pointer-events:none;
+}
+.time-wheel:before{
+  top:0;
+  background:linear-gradient(to bottom,#0a1620 18%,rgba(10,22,32,0));
+}
+.time-wheel:after{
+  bottom:0;
+  background:linear-gradient(to top,#0a1620 18%,rgba(10,22,32,0));
+}
+.time-wheel-highlight{
+  position:absolute;
+  z-index:0;
+  left:0;
+  right:0;
+  top:57px;
+  height:50px;
+  border-radius:4px;
+  background:#154a3a;
+  box-shadow:inset 0 0 0 1px rgba(19,213,158,.08);
+  pointer-events:none;
+}
+.time-options{
+  position:absolute;
+  z-index:2;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scroll-snap-type:y mandatory;
+  scrollbar-width:none;
+  padding:57px 0;
+}
+.time-options::-webkit-scrollbar{display:none}
+.time-option{
+  flex:0 0 50px;
+  height:50px;
+  scroll-snap-align:center;
+  border:0;
+  border-radius:4px;
+  background:transparent;
+  color:#536a79;
+  padding:0 5px;
+  font-size:14px;
+  transition:color .12s,opacity .12s,transform .12s;
+  opacity:.62;
+}
+.time-option.active{
+  background:transparent;
+  color:var(--green);
+  opacity:1;
+  transform:scale(1.04);
+}
+.amount-title{font-size:14px;margin-bottom:10px}
+.amount-input{
+  height:50px;border:1px solid #2a3c49;border-radius:5px;
+  background:#0a141d;color:#e7ecef;width:100%;padding:0 13px;outline:none;
+}
+.amount-input::placeholder{color:#b8c2c9}
+.sheet-percent{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px;
+}
+.sheet-percent button{
+  border:0;border-radius:4px;background:#0d1923;color:#617484;padding:11px 4px;
+}
+.sheet-percent button.active{background:#193b31;color:var(--green)}
+.execute-btn{
+  width:100%;height:49px;border:0;border-radius:5px;
+  margin-top:26px;color:white;font-weight:800;
+}
+.execute-btn.call{background:var(--green)}
+.execute-btn.put{background:var(--red)}
+.sheet-note{
+  color:#6f8291;font-size:10px;line-height:1.45;text-align:center;margin-top:10px;
+}
+/* loading */
+.loading{
+  position:fixed;z-index:80;inset:0;
+  width:min(430px,100%);left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;
+}
+.loading.show{display:flex}
+.loading-inner{text-align:center;color:#dce3e7}
+.spinner{
+  width:25px;height:25px;border-radius:50%;margin:15px auto 0;
+  border:3px solid #173641;border-top-color:#1ed4c6;animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{
+  position:fixed;z-index:90;left:50%;bottom:120px;transform:translate(-50%,15px);
+  width:min(380px,calc(100% - 32px));background:#13212d;border:1px solid #263947;
+  color:#e2e8eb;text-align:center;border-radius:7px;padding:12px;
+  font-size:12px;opacity:0;pointer-events:none;transition:.2s;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(min-width:431px){
+  body{padding:22px 0}
+  .phone{border-radius:14px;min-height:calc(100dvh - 44px)}
+  .action-bar,.bottom-nav{width:430px}
+  .bottom-nav{bottom:22px;border-radius:0 0 14px 14px}
+  .action-bar{bottom:85px}
+}
+
+.auth-gate{
+  position:absolute;z-index:70;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;background:#08131d;
+}
+.auth-gate.hidden{display:none}
+.auth-card{
+  width:100%;max-width:350px;
+  background:#0d1924;border:1px solid #1c2d3a;
+  border-radius:12px;padding:22px;
+}
+.auth-logo{font-size:23px;font-weight:800;margin-bottom:7px}
+.auth-sub{font-size:12px;line-height:1.5;color:#8193a2;margin-bottom:20px}
+.auth-label{display:block;color:#a9b6c0;font-size:12px;margin:13px 0 7px}
+.auth-input{
+  width:100%;height:46px;border:1px solid #253845;border-radius:6px;
+  background:#09141d;color:#eef2f4;padding:0 12px;outline:none;
+}
+.auth-input:focus{border-color:#18b98e}
+.auth-login{
+  width:100%;height:47px;margin-top:18px;border:0;border-radius:6px;
+  background:var(--green);color:#052018;font-weight:900;
+}
+.auth-message{min-height:18px;margin-top:12px;font-size:11px;color:var(--red);line-height:1.4}
+.auth-safe{
+  border-top:1px solid #172733;margin-top:17px;padding-top:13px;
+  color:#718493;font-size:10px;line-height:1.5;
+}
+.assets-top{
+  display:flex;align-items:center;justify-content:space-between;
+}
+.logout-btn{
+  border:1px solid #263947;background:transparent;color:#91a1af;
+  border-radius:6px;padding:8px 11px;font-size:11px;
+}
+.connection-label{
+  color:#dff9f1;font-size:11px;margin-top:6px;opacity:.9
+}
+.sync-note{color:#6e8190;font-size:10px;margin-top:4px}
+.history-empty{
+  padding:40px 10px;text-align:center;color:#6f8190;font-size:12px;
+}
+.history-status.failed{color:var(--red)}
+.history-status.cancelled{color:#8b9aa6}
+.history-status.pending{color:#e6bd63}
+.history-status.open{color:var(--green)}
+.login-user{font-size:10px;color:#708392;margin-top:5px}
+
+
+.history-filter{
+  display:flex;
+  gap:7px;
+  padding:12px 0 7px;
+}
+.history-filter button{
+  border:1px solid #1c2c38;
+  background:#0b1721;
+  color:#6f8292;
+  padding:7px 10px;
+  border-radius:5px;
+  font-size:10px;
+}
+.history-filter button.active{
+  color:var(--green);
+  border-color:#205647;
+  background:#103027;
+}
+
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="phone">
+
+  <div id="authGate" class="auth-gate">
+    <div class="auth-card">
+      <div class="auth-logo">TradingRemote</div>
+      <div class="auth-sub">
+        Melde dich mit deinem privaten App-Konto an. Danach kannst du CALL/PUT-Aufträge
+        sicher in deine persönliche Supabase-Warteschlange eintragen.
+      </div>
+      <label class="auth-label" for="loginEmail">E-Mail</label>
+      <input id="loginEmail" class="auth-input" type="email" autocomplete="email">
+      <label class="auth-label" for="loginPassword">Passwort</label>
+      <input id="loginPassword" class="auth-input" type="password" autocomplete="current-password">
+      <button id="loginBtn" class="auth-login">ANMELDEN</button>
+      <div id="loginMessage" class="auth-message"></div>
+      <div class="auth-safe">
+        In dieser App befindet sich nur der öffentliche Supabase-Publishable-Key.
+        Binance-API-Key und Binance-Secret gehören später ausschließlich auf den Trading-PC.
+      </div>
+    </div>
+  </div>
+
+  <section id="futuresView" class="view active">
+    <header class="header">
+      <div class="menu"><span></span></div>
+      <div class="pair">BTC / USDT</div>
+      <div id="marketChange" class="change">+0.50%</div>
+      <div class="info">i</div>
+      <div class="trend">Trend <span class="chev"></span></div>
+    </header>
+
+    <div id="durationBar" class="duration">
+      <button class="active" data-duration="60">60s</button>
+      <button data-duration="120">120s</button>
+      <button data-duration="300">5min</button>
+      <button data-duration="600">10min</button>
+    </div>
+
+    <div class="order-summary">
+      <div class="summary-block">
+        <div class="summary-label">Order<br>deadline (UTC+2)</div>
+        <div id="deadlineValue" class="summary-value">2026/08/27 14:37:00</div>
+      </div>
+      <div class="summary-block center">
+        <div class="summary-label green">Countdown</div>
+        <div id="countdownValue" class="summary-value count">37 s</div>
+      </div>
+      <div class="summary-block right">
+        <div class="summary-label">Time Period</div>
+        <div id="periodValue" class="summary-value">14:37~14:38</div>
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-tools">
+        <span>1m Candles</span>
+        <span style="margin-left:auto;color:#627686;font-size:10px">↔ ziehen · halten für Preis</span>
+      </div>
+      <div class="chart" id="chartSurface">
+        <div id="chartPan" class="chart-pan" aria-label="BTCUSDT Chart – seitlich ziehen; halten und hoch oder runter bewegen zeigt den Preis">
+          <div id="chartTrack" class="chart-track">
+            <div class="chart-grid"></div>
+            <svg id="candleSvg" viewBox="0 0 1040 270" preserveAspectRatio="none"></svg>
+            <div id="timeAxis" class="time-axis"></div>
+          </div>
+        </div>
+        <div id="chartCrosshair" class="chart-crosshair" hidden>
+          <div id="crosshairPrice" class="crosshair-price">—</div>
+          <div id="chartTouchDot" class="chart-touch-dot"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="contentTabs" class="content-tabs">
+      <div class="content-tab active" data-tab="position">Position order</div>
+      <div class="content-tab" data-tab="history">Historical orders</div>
+      <div class="content-tab">Invited me</div>
+      <div class="content-tab">Follow-up plan</div>
+    </div>
+
+    <div id="positionPanel" class="tab-panel active">
+      <div id="emptyState" class="empty">
+        <div class="empty-art">
+          <div class="cloud c1"></div><div class="cloud c2"></div>
+          <div class="building b1"></div><div class="building b2"></div><div class="building b3"></div>
+          <div class="paper"></div>
+        </div>
+      </div>
+
+      <div id="pendingState" class="pending" hidden>
+        <div class="pending-head">
+          <div id="pendingStatus" class="pending-status">Pending</div>
+          <button id="cancelOrder" class="cancel-btn">Cancel</button>
+        </div>
+        <div class="pending-grid">
+          <div class="pending-key">Product</div><div class="pending-val">BTCUSDT</div>
+          <div class="pending-key">Direction</div><div id="pendingDir" class="pending-val" style="color:var(--green)">CALL</div>
+          <div class="pending-key">Time Period</div><div id="pendingTime" class="pending-val">60s (14:37~14:38)</div>
+          <div class="pending-key">Amount</div><div id="pendingPct" class="pending-val">1%</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="historyPanel" class="tab-panel history-panel">
+      <div id="historyFilter" class="history-filter">
+        <button class="active" data-history-filter="completed">Completed</button>
+        <button data-history-filter="cancelled">Cancelled</button>
+        <button data-history-filter="all">All</button>
+      </div>
+      <div id="historyList"></div>
+    </div>
+  </section>
+
+  <section id="assetsView" class="view">
+    <div class="assets-view">
+      <div class="assets-top">
+        <div>
+          <div class="assets-title" style="padding-bottom:4px">Assets</div>
+          <div id="loginUser" class="login-user"></div>
+        </div>
+        <button id="logoutBtn" class="logout-btn">Abmelden</button>
+      </div>
+
+      <div class="asset-hero">
+        <div class="asset-label">Total Assets ◉</div>
+        <div id="assetTotal" class="asset-total">— USDT</div>
+        <div class="asset-day">Täglicher Gewinn: <strong id="assetDayPnl">0.00 USDT</strong><div class="connection-label">Supabase verbunden</div></div>
+      </div>
+
+      <div class="asset-stats">
+        <div class="asset-stat">
+          <div class="label">Diese Woche</div>
+          <div id="assetWeekPnl" class="value">0.00</div>
+        </div>
+        <div class="asset-stat">
+          <div class="label">Trades heute</div>
+          <div id="assetTradesToday" class="value">0</div>
+        </div>
+        <div class="asset-stat">
+          <div class="label">Gewonnen / Verloren</div>
+          <div id="assetWinLoss" class="value">0 / 0</div>
+        </div>
+      </div>
+
+      <div class="asset-section">My account</div>
+      <div class="account-list">
+        <div class="account-row">
+          <div>
+            <div class="account-name">Futures Balance</div>
+            <div id="futuresBalance" class="account-amount">— USDT</div>
+            <div id="balanceSync" class="sync-note">Warte auf Trading-PC...</div>
+          </div>
+          <div class="account-arrow">›</div>
+        </div>
+        <div class="account-row">
+          <div>
+            <div class="account-name">Verfügbar</div>
+            <div id="availableBalance" class="account-amount">— USDT</div>
+          </div>
+          <div class="account-arrow">›</div>
+        </div>
+        <div class="account-row">
+          <div><div class="account-name">Täglicher Gewinn</div><div id="accountDayPnl" class="account-amount">0.00 USDT</div></div>
+          <div class="account-arrow">›</div>
+        </div>
+        <div class="account-row">
+          <div><div class="account-name">Gesamtgewinn</div><div id="accountTotalPnl" class="account-amount">0.00 USDT</div></div>
+          <div class="account-arrow">›</div>
+        </div>
+      </div>
+
+      <div class="asset-section">Letzte Ergebnisse</div>
+      <div id="assetRecentResults" class="mini-results"></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="actionBar" class="action-bar">
+    <button id="openCall" class="call-main"><span class="action-icon">↗</span>CALL</button>
+    <button id="openPut" class="put-main">PUT<span class="action-icon" style="margin:0 0 0 8px">↘</span></button>
+  </div>
+
+  <nav class="bottom-nav">
+    <button id="futuresNav" class="nav-btn active"><span class="nav-icon futures"></span>Futures</button>
+    <button id="assetsNav" class="nav-btn"><span class="nav-icon assets"></span>Assets</button>
+  </nav>
+
+  <div id="sheetBackdrop" class="sheet-backdrop">
+    <div class="sheet">
+      <div class="sheet-header">
+        <div class="sheet-title">BTC / USDT</div>
+        <button id="sheetClose" class="sheet-close">Cancel</button>
+      </div>
+      <div class="sheet-body">
+        <div class="sheet-summary">
+          <div><div class="sheet-k">Min</div><div class="sheet-v">1</div></div>
+          <div class="right"><div class="sheet-k">Available</div><div class="sheet-v" style="color:var(--green)">Live at execution</div></div>
+        </div>
+
+        <div class="time-amount">
+          <div class="time-wheel">
+            <div id="timeOptions" class="time-options"></div>
+            <div class="time-wheel-highlight" aria-hidden="true"></div>
+          </div>
+          <div>
+            <div class="amount-title">Amount</div>
+            <input id="amountPreview" class="amount-input" readonly placeholder="Calculated at execution">
+            <div id="sheetPercent" class="sheet-percent">
+              <button data-p="1" class="active">1%</button>
+              <button data-p="3">3%</button>
+              <button data-p="5">5%</button>
+            </div>
+          </div>
+        </div>
+
+        <button id="executeBtn" class="execute-btn call">CALL</button>
+        <div class="sheet-note">
+          Der endgültige Betrag wird erst zum Ausführungszeitpunkt aus dem dann aktuell verfügbaren Futures-Guthaben berechnet.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading" class="loading">
+    <div class="loading-inner">Loading...<div class="spinner"></div></div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const SUPABASE_URL = "https://pxcqcrqqynmtwaeqsnkx.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_5MT-lmXWe-0sIjXZ6NX1aA_M9S2tP3J";
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+const BERLIN_TZ = "Europe/Berlin";
+let currentUser = null;
+let commandRows = [];
+let accountStatus = null;
+let selectedDuration = 60;
+let selectedPercent = 1;
+let selectedDirection = "CALL";
+let selectedStart = null;
+let shownPending = null;
+let price = null;
+let chartBounds = null;
+let pollTimer = null;
+let loadingCommands = false;
+let tickerSocket = null;
+let timeWheelFrame = 0;
+let historyFilter = "completed";
+let chartInitiallyCentered = false;
+let chartUserMoved = false;
+
+function pad(n){ return String(n).padStart(2,"0"); }
+function esc(value){
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  })[ch]);
+}
+function num(value){
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+function money(value, signed=false){
+  const n = num(value);
+  const sign = signed && n > 0 ? "+" : "";
+  return `${sign}${n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})} USDT`;
+}
+function durationLabel(seconds){
+  if(seconds === 60) return "60s";
+  if(seconds === 120) return "120s";
+  if(seconds === 300) return "5min";
+  return "10min";
+}
+
+function berlinParts(date=new Date()){
+  const parts = new Intl.DateTimeFormat("en-CA",{
+    timeZone:BERLIN_TZ,
+    year:"numeric",month:"2-digit",day:"2-digit",
+    hour:"2-digit",minute:"2-digit",second:"2-digit",
+    hourCycle:"h23"
+  }).formatToParts(date);
+  const out = {};
+  for(const part of parts){
+    if(part.type !== "literal") out[part.type] = part.value;
+  }
+  return out;
+}
+function berlinWallToUtc(dateText,timeText){
+  const [year,month,day] = dateText.split("-").map(Number);
+  const [hour,minute,second=0] = timeText.split(":").map(Number);
+  const desired = Date.UTC(year,month-1,day,hour,minute,second);
+  let guess = desired;
+  for(let i=0;i<4;i++){
+    const p = berlinParts(new Date(guess));
+    const shown = Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);
+    guess += desired - shown;
+  }
+  return new Date(guess);
+}
+function roundedNextBerlinMinute(offset=1){
+  const future = new Date(Date.now() + offset*60000);
+  const p = berlinParts(future);
+  return berlinWallToUtc(
+    `${p.year}-${p.month}-${p.day}`,
+    `${p.hour}:${p.minute}:00`
+  );
+}
+function berlinDateKey(date){
+  const p = berlinParts(date);
+  return `${p.year}-${p.month}-${p.day}`;
+}
+function berlinTime(date, includeSeconds=false){
+  const p = berlinParts(date);
+  return `${p.hour}:${p.minute}${includeSeconds ? `:${p.second}` : ""}`;
+}
+function fullDeadline(date){
+  const p = berlinParts(date);
+  return `${p.year}/${p.month}/${p.day} ${p.hour}:${p.minute}:${p.second}`;
+}
+function periodText(start,duration){
+  const end = new Date(start.getTime()+duration*1000);
+  return `${berlinTime(start)}~${berlinTime(end)}`;
+}
+
+function showToast(text){
+  $("toast").textContent = text;
+  $("toast").classList.add("show");
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(()=>$("toast").classList.remove("show"),2200);
+}
+function setBusy(show){
+  $("loading").classList.toggle("show",show);
+}
+function quickLoading(){
+  setBusy(true);
+  setTimeout(()=>setBusy(false),260);
+}
+
+function applySession(session){
+  currentUser = session?.user ?? null;
+  $("authGate").classList.toggle("hidden",!!currentUser);
+  $("loginUser").textContent = currentUser?.email ?? "";
+  if(currentUser){
+    if(!shownPending){
+      selectedStart = roundedNextBerlinMinute(1);
+      refreshOrderSummary();
+    }
+    loadCommands();
+    if(!pollTimer) pollTimer = setInterval(loadCommands,5000);
+  }else{
+    commandRows = [];
+    renderCommands();
+    if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+  }
+}
+async function login(){
+  const email = $("loginEmail").value.trim();
+  const password = $("loginPassword").value;
+  $("loginMessage").textContent = "";
+  if(!email || !password){
+    $("loginMessage").textContent = "E-Mail und Passwort eingeben.";
+    return;
+  }
+  $("loginBtn").disabled = true;
+  const {error} = await db.auth.signInWithPassword({email,password});
+  $("loginBtn").disabled = false;
+  if(error) $("loginMessage").textContent = error.message;
+}
+$("loginBtn").onclick = login;
+$("loginPassword").addEventListener("keydown",event=>{
+  if(event.key === "Enter") login();
+});
+$("logoutBtn").onclick = ()=>db.auth.signOut();
+db.auth.onAuthStateChange((_event,session)=>applySession(session));
+db.auth.getSession().then(({data})=>applySession(data.session));
+
+function refreshOrderSummary(){
+  if(!selectedStart) selectedStart = roundedNextBerlinMinute(1);
+  $("deadlineValue").textContent = fullDeadline(selectedStart);
+  $("periodValue").textContent = periodText(selectedStart,selectedDuration);
+}
+function updateCountdown(){
+  if(!selectedStart) return;
+  let diff = Math.ceil((selectedStart.getTime()-Date.now())/1000);
+  if(diff <= 0 && !shownPending && !$("sheetBackdrop").classList.contains("open")){
+    selectedStart = roundedNextBerlinMinute(1);
+    refreshOrderSummary();
+    diff = Math.ceil((selectedStart.getTime()-Date.now())/1000);
+  }
+  $("countdownValue").textContent = `${Math.max(0,diff)} s`;
+}
+selectedStart = roundedNextBerlinMinute(1);
+refreshOrderSummary();
+updateCountdown();
+setInterval(updateCountdown,1000);
+
+document.querySelectorAll("#durationBar button").forEach(button=>{
+  button.onclick = ()=>{
+    document.querySelectorAll("#durationBar button").forEach(x=>x.classList.remove("active"));
+    button.classList.add("active");
+    selectedDuration = Number(button.dataset.duration);
+    refreshOrderSummary();
+    renderPending();
+  };
+});
+
+function selectTimeButton(button){
+  const box = $("timeOptions");
+  box.querySelectorAll("button").forEach(x=>x.classList.remove("active"));
+  button.classList.add("active");
+  selectedStart = new Date(Number(button.dataset.timestamp));
+  refreshOrderSummary();
+}
+function selectNearestTime(){
+  const box = $("timeOptions");
+  const center = box.scrollTop + box.clientHeight/2;
+  let nearest = null;
+  let best = Infinity;
+  box.querySelectorAll("button").forEach(button=>{
+    const buttonCenter = button.offsetTop + button.offsetHeight/2;
+    const distance = Math.abs(buttonCenter-center);
+    if(distance < best){ best = distance; nearest = button; }
+  });
+  if(nearest && !nearest.classList.contains("active")) selectTimeButton(nearest);
+}
+function buildTimeOptions(){
+  const box = $("timeOptions");
+  box.innerHTML = "";
+  for(let offset=1;offset<=180;offset++){
+    const date = roundedNextBerlinMinute(offset);
+    const button = document.createElement("button");
+    button.className = "time-option" + (offset===1 ? " active" : "");
+    button.dataset.timestamp = String(date.getTime());
+    button.textContent = berlinTime(date);
+    button.onclick = ()=>{
+      button.scrollIntoView({behavior:"smooth",block:"center"});
+      selectTimeButton(button);
+    };
+    box.appendChild(button);
+  }
+  box.scrollTop = 0;
+  const first = box.querySelector("button");
+  if(first) selectTimeButton(first);
+  box.onscroll = ()=>{
+    cancelAnimationFrame(timeWheelFrame);
+    timeWheelFrame = requestAnimationFrame(selectNearestTime);
+  };
+}
+function updateAmountPreview(){
+  $("amountPreview").value = `${selectedPercent}% vom Live-Guthaben`;
+}
+function openSheet(direction){
+  selectedDirection = direction;
+  selectedStart = roundedNextBerlinMinute(1);
+  buildTimeOptions();
+  refreshOrderSummary();
+  const execute = $("executeBtn");
+  execute.textContent = direction;
+  execute.className = `execute-btn ${direction.toLowerCase()}`;
+  $("sheetBackdrop").classList.add("open");
+  updateAmountPreview();
+}
+$("openCall").onclick = ()=>openSheet("CALL");
+$("openPut").onclick = ()=>openSheet("PUT");
+$("sheetClose").onclick = ()=>$("sheetBackdrop").classList.remove("open");
+$("sheetBackdrop").onclick = event=>{
+  if(event.target === $("sheetBackdrop")) $("sheetBackdrop").classList.remove("open");
+};
+document.querySelectorAll("#sheetPercent button").forEach(button=>{
+  button.onclick = ()=>{
+    document.querySelectorAll("#sheetPercent button").forEach(x=>x.classList.remove("active"));
+    button.classList.add("active");
+    selectedPercent = Number(button.dataset.p);
+    updateAmountPreview();
+  };
+});
+
+async function createCommand(){
+  if(!currentUser){
+    showToast("Bitte zuerst anmelden.");
+    return;
+  }
+  if(!selectedStart || selectedStart.getTime() <= Date.now()+3000){
+    showToast("Wähle eine Startzeit in der Zukunft.");
+    return;
+  }
+  $("sheetBackdrop").classList.remove("open");
+  setBusy(true);
+  const payload = {
+    symbol:"BTCUSDT",
+    direction:selectedDirection,
+    execute_at:selectedStart.toISOString(),
+    duration_seconds:selectedDuration,
+    amount_percent:selectedPercent,
+    status:"PENDING"
+  };
+  const {data,error} = await db
+    .from("trade_commands")
+    .insert(payload)
+    .select()
+    .single();
+  setBusy(false);
+  if(error){
+    showToast(`Fehler: ${error.message}`);
+    return;
+  }
+  showToast(`${data.direction} · ${durationLabel(data.duration_seconds)} · ${data.amount_percent}% gespeichert`);
+  await loadCommands();
+}
+$("executeBtn").onclick = createCommand;
+
+async function loadCommands(){
+  if(!currentUser || loadingCommands) return;
+  loadingCommands = true;
+
+  const [commandsResult, accountResult] = await Promise.all([
+    db
+      .from("trade_commands")
+      .select("*")
+      .order("execute_at",{ascending:false})
+      .limit(100),
+
+    db
+      .from("account_status")
+      .select("futures_balance,available_balance,unrealized_pnl,updated_at")
+      .eq("owner_id",currentUser.id)
+      .maybeSingle()
+  ]);
+
+  loadingCommands = false;
+
+  if(commandsResult.error){
+    showToast(`Supabase: ${commandsResult.error.message}`);
+    return;
+  }
+
+  commandRows = commandsResult.data ?? [];
+
+  if(accountResult.error){
+    console.warn("account_status:", accountResult.error.message);
+    accountStatus = null;
+  }else{
+    accountStatus = accountResult.data ?? null;
+  }
+
+  renderCommands();
+}
+function activeCommands(){
+  return commandRows
+    .filter(row=>["PENDING","CLAIMED","OPEN"].includes(row.status))
+    .sort((a,b)=>new Date(a.execute_at)-new Date(b.execute_at));
+}
+function renderPending(){
+  const active = activeCommands();
+  shownPending = active[0] ?? null;
+  $("emptyState").hidden = !!shownPending;
+  $("pendingState").hidden = !shownPending;
+  if(!shownPending) return;
+
+  $("pendingStatus").textContent = shownPending.status;
+  $("pendingStatus").style.color =
+    shownPending.status === "PENDING" ? "#f0be63" : "var(--green)";
+  $("pendingDir").textContent = shownPending.direction;
+  $("pendingDir").style.color =
+    shownPending.direction === "CALL" ? "var(--green)" : "var(--red)";
+
+  const start = new Date(shownPending.execute_at);
+  $("pendingTime").textContent =
+    `${durationLabel(shownPending.duration_seconds)} (${periodText(start,shownPending.duration_seconds)})`;
+  $("pendingPct").textContent = `${shownPending.amount_percent}%`;
+  $("cancelOrder").hidden = shownPending.status !== "PENDING";
+}
+$("cancelOrder").onclick = async()=>{
+  if(!shownPending || shownPending.status !== "PENDING") return;
+  setBusy(true);
+  const {error} = await db
+    .from("trade_commands")
+    .update({status:"CANCELLED"})
+    .eq("id",shownPending.id)
+    .eq("status","PENDING");
+  setBusy(false);
+  if(error) showToast(`Fehler: ${error.message}`);
+  else{
+    showToast("Auftrag storniert.");
+    loadCommands();
+  }
+};
+
+function statusClass(status){
+  return String(status).toLowerCase();
+}
+function renderHistory(){
+  const box = $("historyList");
+
+  let rows = commandRows;
+  if(historyFilter === "completed"){
+    rows = commandRows.filter(row=>row.status === "COMPLETED");
+  }else if(historyFilter === "cancelled"){
+    rows = commandRows.filter(row=>row.status === "CANCELLED");
+  }
+
+  if(!rows.length){
+    const label =
+      historyFilter === "completed" ? "Noch keine abgeschlossenen Trades." :
+      historyFilter === "cancelled" ? "Keine stornierten Aufträge." :
+      "Noch keine Aufträge.";
+    box.innerHTML = `<div class="history-empty">${label}</div>`;
+    return;
+  }
+
+  box.innerHTML = rows.map(row=>{
+    const start = new Date(row.execute_at);
+    const pnl = row.pnl == null ? null : num(row.pnl);
+    const pnlColor = pnl == null ? "#d7dde1" : (pnl >= 0 ? "var(--green)" : "var(--red)");
+    const entry = row.entry_price == null ? "—" : Number(row.entry_price).toLocaleString("en-US",{maximumFractionDigits:2});
+    const exit = row.exit_price == null ? "—" : Number(row.exit_price).toLocaleString("en-US",{maximumFractionDigits:2});
+    const feeText = row.fees == null ? "—" : money(num(row.fees),false);
+
+    return `<div class="history-row">
+      <div class="history-top">
+        <span class="history-status ${statusClass(row.status)}">${esc(row.status)}</span>
+        <span>BTCUSDT</span>
+      </div>
+      <div class="history-grid">
+        <div class="key">Direction</div>
+        <div class="val" style="color:${row.direction==="CALL" ? "var(--green)" : "var(--red)"}">${esc(row.direction)}</div>
+        <div class="key">Start</div><div class="val">${esc(fullDeadline(start))}</div>
+        <div class="key">Time Period</div>
+        <div class="val">${durationLabel(row.duration_seconds)} (${periodText(start,row.duration_seconds)})</div>
+        <div class="key">Amount</div><div class="val">${esc(row.amount_percent)}%</div>
+        <div class="key">Open Price</div><div class="val">${entry}</div>
+        <div class="key">Settlement Price</div><div class="val">${exit}</div>
+        <div class="key">Fees</div><div class="val">${feeText}</div>
+        <div class="key">Net PnL</div>
+        <div class="val" style="color:${pnlColor}">${pnl == null ? "—" : money(pnl,true)}</div>
+        ${row.error_message ? `<div class="key">Error</div><div class="val" style="color:var(--red)">${esc(row.error_message)}</div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+document.querySelectorAll("#historyFilter button").forEach(button=>{
+  button.onclick=()=>{
+    document.querySelectorAll("#historyFilter button").forEach(x=>x.classList.remove("active"));
+    button.classList.add("active");
+    historyFilter = button.dataset.historyFilter;
+    renderHistory();
+  };
+});
+
+function mondayKeyBerlin(){
+  const p = berlinParts(new Date());
+  const wall = new Date(Date.UTC(+p.year,+p.month-1,+p.day));
+  const day = wall.getUTCDay();
+  const distance = day === 0 ? 6 : day-1;
+  wall.setUTCDate(wall.getUTCDate()-distance);
+  return `${wall.getUTCFullYear()}-${pad(wall.getUTCMonth()+1)}-${pad(wall.getUTCDate())}`;
+}
+function completedDate(row){
+  return new Date(row.closed_at || row.execute_at);
+}
+function renderAssets(){
+  const completed = commandRows.filter(row=>row.status==="COMPLETED");
+  const todayKey = berlinDateKey(new Date());
+  const weekKey = mondayKeyBerlin();
+  const todayRows = completed.filter(row=>berlinDateKey(completedDate(row))===todayKey);
+  const weekRows = completed.filter(row=>berlinDateKey(completedDate(row))>=weekKey);
+
+  const dayPnl = todayRows.reduce((sum,row)=>sum+num(row.pnl),0);
+  const weekPnl = weekRows.reduce((sum,row)=>sum+num(row.pnl),0);
+  const totalPnl = completed.reduce((sum,row)=>sum+num(row.pnl),0);
+  const wins = todayRows.filter(row=>num(row.pnl)>0).length;
+  const losses = todayRows.filter(row=>num(row.pnl)<0).length;
+
+  // Live balance data comes from the Trading-PC via account_status.
+  if(accountStatus){
+    const wallet = num(accountStatus.futures_balance);
+    const available = num(accountStatus.available_balance);
+    const unrealized = num(accountStatus.unrealized_pnl);
+    const updated = new Date(accountStatus.updated_at);
+
+    $("assetTotal").textContent = money(wallet,false);
+    $("futuresBalance").textContent = money(wallet,false);
+    $("availableBalance").textContent = money(available,false);
+
+    const ageSeconds = Math.max(0,Math.round((Date.now()-updated.getTime())/1000));
+    $("balanceSync").textContent =
+      ageSeconds <= 15
+        ? `Trading-PC live · ${ageSeconds}s`
+        : `Letzte Sync: ${fullDeadline(updated)}`;
+
+    // If there ever is an open position, show current unrealized PnL in the sync line.
+    if(Math.abs(unrealized) > 0.0000001){
+      $("balanceSync").textContent += ` · Open PnL ${money(unrealized,true)}`;
+    }
+  }else{
+    $("assetTotal").textContent = "— USDT";
+    $("futuresBalance").textContent = "— USDT";
+    $("availableBalance").textContent = "— USDT";
+    $("balanceSync").textContent = "Warte auf Trading-PC...";
+  }
+
+  $("assetDayPnl").textContent = money(dayPnl,true);
+  $("assetDayPnl").style.color = dayPnl >= 0 ? "white" : "#ffe0e3";
+
+  $("assetWeekPnl").textContent = money(weekPnl,true).replace(" USDT","");
+  $("assetWeekPnl").style.color = weekPnl >= 0 ? "var(--green)" : "var(--red)";
+
+  $("assetTradesToday").textContent = String(todayRows.length);
+  $("assetWinLoss").textContent = `${wins} / ${losses}`;
+
+  $("accountDayPnl").textContent = money(dayPnl,true);
+  $("accountDayPnl").style.color = dayPnl>=0 ? "var(--green)" : "var(--red)";
+
+  $("accountTotalPnl").textContent = money(totalPnl,true);
+  $("accountTotalPnl").style.color = totalPnl>=0 ? "var(--green)" : "var(--red)";
+
+  const recent = completed
+    .slice()
+    .sort((a,b)=>completedDate(b)-completedDate(a))
+    .slice(0,5);
+
+  $("assetRecentResults").innerHTML = recent.length ? recent.map(row=>{
+    const pnl = num(row.pnl);
+    return `<div class="mini-row">
+      <span class="direction-pill ${row.direction.toLowerCase()}">${esc(row.direction)}</span>
+      <div>
+        <strong>BTCUSDT · ${durationLabel(row.duration_seconds)} · ${esc(row.amount_percent)}%</strong>
+        <div class="mini-meta">${esc(fullDeadline(completedDate(row)))}</div>
+      </div>
+      <span style="color:${pnl>=0 ? "var(--green)" : "var(--red)"};font-weight:800">
+        ${money(pnl,true).replace(" USDT","")}
+      </span>
+    </div>`;
+  }).join("") : '<div class="history-empty">Noch keine abgeschlossenen Trades.</div>';
+}
+function renderCommands(){
+  renderPending();
+  renderHistory();
+  renderAssets();
+}
+
+document.querySelectorAll(".content-tab[data-tab]").forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll(".content-tab[data-tab]").forEach(x=>x.classList.remove("active"));
+    tab.classList.add("active");
+    const position = tab.dataset.tab === "position";
+    $("positionPanel").classList.toggle("active",position);
+    $("historyPanel").classList.toggle("active",!position);
+    quickLoading();
+  };
+});
+
+function showView(name){
+  const futures = name === "futures";
+  $("futuresView").classList.toggle("active",futures);
+  $("assetsView").classList.toggle("active",!futures);
+  $("futuresNav").classList.toggle("active",futures);
+  $("assetsNav").classList.toggle("active",!futures);
+  $("actionBar").style.display = futures ? "grid" : "none";
+  quickLoading();
+}
+$("futuresNav").onclick = ()=>showView("futures");
+$("assetsNav").onclick = ()=>showView("assets");
+
+function drawKlines(rows){
+  if(!Array.isArray(rows) || !rows.length) return;
+
+  const candles = rows.map(row=>({
+    openTime:new Date(Number(row[0])),
+    open:Number(row[1]),
+    high:Number(row[2]),
+    low:Number(row[3]),
+    close:Number(row[4])
+  }));
+
+  const rawMin = Math.min(...candles.map(c=>c.low));
+  const rawMax = Math.max(...candles.map(c=>c.high));
+  const rawRange = Math.max(1,rawMax-rawMin);
+  const verticalPadding = Math.max(rawRange*.14,rawMax*.00035);
+  const min = rawMin-verticalPadding;
+  const max = rawMax+verticalPadding;
+  const range = Math.max(1,max-min);
+
+  const priceTop = 16;
+  const priceBottom = 244;
+  const priceHeight = priceBottom-priceTop;
+  chartBounds = {min,max,priceTop,priceBottom};
+
+  const leftPadding = 28;
+  const futurePadding = 210;
+  const step = 18;
+  const dataWidth = candles.length*step;
+  const width = Math.max(1040,leftPadding+dataWidth+futurePadding);
+  const bodyWidth = 9;
+  const y = value=>priceTop+(max-value)/range*priceHeight;
+
+  const track = $("chartTrack");
+  const svg = $("candleSvg");
+  track.style.width = `${width}px`;
+  track.style.minWidth = `${width}px`;
+  svg.setAttribute("viewBox",`0 0 ${width} 270`);
+
+  let output = "";
+  candles.forEach((c,index)=>{
+    const x = leftPadding+index*step+(step-bodyWidth)/2;
+    const rising = c.close >= c.open;
+    const color = rising ? "#13d59e" : "#f45e69";
+    const openY = y(c.open);
+    const closeY = y(c.close);
+    const highY = y(c.high);
+    const lowY = y(c.low);
+    const bodyY = Math.min(openY,closeY);
+    const bodyH = Math.max(1.5,Math.abs(openY-closeY));
+
+    output += `<line x1="${x+bodyWidth/2}" y1="${highY}" x2="${x+bodyWidth/2}" y2="${lowY}" stroke="${color}" stroke-width="1.1"/>`;
+    output += `<rect x="${x}" y="${bodyY}" width="${bodyWidth}" height="${bodyH}" fill="${color}" rx=".7"/>`;
+  });
+  svg.innerHTML = output;
+
+  const labelIndices = [
+    0,
+    Math.floor((candles.length-1)/3),
+    Math.floor((candles.length-1)*2/3),
+    candles.length-1
+  ];
+  $("timeAxis").innerHTML = labelIndices.map(index=>{
+    const x = leftPadding+index*step+step/2;
+    return `<span style="left:${x}px">${berlinTime(candles[index].openTime)}</span>`;
+  }).join("");
+
+  requestAnimationFrame(()=>{
+    const pan = $("chartPan");
+    if(!chartInitiallyCentered || !chartUserMoved){
+      const lastCenter = leftPadding+(candles.length-1)*step+step/2;
+      const desired = lastCenter-pan.clientWidth*.70;
+      pan.scrollLeft = Math.max(0,Math.min(pan.scrollWidth-pan.clientWidth,desired));
+      chartInitiallyCentered = true;
+    }
+  });
+}
+async function loadKlines(){
+  try{
+    const response = await fetch("https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1m&limit=45");
+    if(!response.ok) throw new Error(`HTTP ${response.status}`);
+    drawKlines(await response.json());
+  }catch(error){
+    console.warn("Klines unavailable:",error);
+  }
+}
+function connectTicker(){
+  try{
+    if(tickerSocket) tickerSocket.close();
+    tickerSocket = new WebSocket("wss://fstream.binance.com/ws/btcusdt@ticker");
+    tickerSocket.onmessage = event=>{
+      const data = JSON.parse(event.data);
+      price = Number(data.c);
+      const change = Number(data.P);
+      $("marketChange").textContent = `${change>=0?"+":""}${change.toFixed(2)}%`;
+      $("marketChange").style.color = change>=0 ? "var(--green)" : "var(--red)";
+    };
+    tickerSocket.onclose = ()=>setTimeout(connectTicker,3000);
+  }catch(error){
+    setTimeout(connectTicker,3000);
+  }
+}
+function setupChartPanning(){
+  const pan = $("chartPan");
+  const surface = $("chartSurface");
+  const crosshair = $("chartCrosshair");
+  const priceLabel = $("crosshairPrice");
+  const touchDot = $("chartTouchDot");
+
+  let activePointer = null;
+  let startX = 0;
+  let startY = 0;
+  let startScroll = 0;
+  let gesture = null;
+
+  const hideCrosshair = ()=>{
+    crosshair.hidden = true;
+  };
+
+  const showCrosshair = (clientX,clientY)=>{
+    if(!chartBounds) return;
+    const rect = surface.getBoundingClientRect();
+    const y = Math.max(
+      chartBounds.priceTop,
+      Math.min(chartBounds.priceBottom,clientY-rect.top)
+    );
+    const ratio = (y-chartBounds.priceTop)/(
+      chartBounds.priceBottom-chartBounds.priceTop
+    );
+    const value = chartBounds.max-ratio*(chartBounds.max-chartBounds.min);
+    const x = Math.max(8,Math.min(rect.width-8,clientX-rect.left));
+
+    crosshair.style.top = `${y}px`;
+    touchDot.style.left = `${x}px`;
+    priceLabel.textContent = value.toLocaleString("en-US",{
+      minimumFractionDigits:2,
+      maximumFractionDigits:2
+    });
+    crosshair.hidden = false;
+  };
+
+  pan.addEventListener("pointerdown",event=>{
+    activePointer = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    startScroll = pan.scrollLeft;
+    gesture = null;
+    pan.classList.add("dragging");
+    pan.setPointerCapture(event.pointerId);
+    showCrosshair(event.clientX,event.clientY);
+    event.preventDefault();
+  });
+
+  pan.addEventListener("pointermove",event=>{
+    if(activePointer === null){
+      if(event.pointerType === "mouse"){
+        showCrosshair(event.clientX,event.clientY);
+      }
+      return;
+    }
+    if(event.pointerId !== activePointer) return;
+
+    const dx = event.clientX-startX;
+    const dy = event.clientY-startY;
+    if(!gesture && (Math.abs(dx)>7 || Math.abs(dy)>7)){
+      gesture = Math.abs(dx) > Math.abs(dy)*1.15 ? "pan" : "price";
+    }
+
+    if(gesture === "pan"){
+      hideCrosshair();
+      pan.scrollLeft = startScroll-dx;
+      chartUserMoved = true;
+    }else{
+      showCrosshair(event.clientX,event.clientY);
+    }
+    event.preventDefault();
+  });
+
+  const finishPointer = event=>{
+    if(activePointer === null || event.pointerId !== activePointer) return;
+    activePointer = null;
+    gesture = null;
+    pan.classList.remove("dragging");
+    try{ pan.releasePointerCapture(event.pointerId); }catch(_error){}
+    if(event.pointerType !== "mouse") hideCrosshair();
+  };
+
+  pan.addEventListener("pointerup",finishPointer);
+  pan.addEventListener("pointercancel",finishPointer);
+  pan.addEventListener("pointerleave",event=>{
+    if(activePointer === null && event.pointerType === "mouse") hideCrosshair();
+  });
+
+  pan.addEventListener("wheel",event=>{
+    const movement = Math.abs(event.deltaX)>Math.abs(event.deltaY)
+      ? event.deltaX
+      : event.deltaY;
+    if(movement !== 0){
+      event.preventDefault();
+      hideCrosshair();
+      pan.scrollLeft += movement;
+      chartUserMoved = true;
+    }
+  },{passive:false});
+
+  pan.addEventListener("scroll",()=>{
+    chartUserMoved = true;
+  },{passive:true});
+}
+setupChartPanning();
+
+loadKlines();
+setInterval(loadKlines,60000);
+connectTicker();
+</script>
+</body>
+</html>
